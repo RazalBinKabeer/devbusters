@@ -29,13 +29,21 @@ class SoundManager {
       await gameOverSound.loadAsync(require('../assets/sounds/game-over.wav'));
       this.sounds['game-over'] = gameOverSound;
 
+      const laserSound = new Audio.Sound();
+      await laserSound.loadAsync(require('../assets/sounds/laser.wav'));
+      this.sounds['laser'] = laserSound;
+
+      const explosionSound = new Audio.Sound();
+      await explosionSound.loadAsync(require('../assets/sounds/explosion.wav'));
+      this.sounds['explosion'] = explosionSound;
+
       console.log('✅ Sounds loaded successfully');
     } catch (e) {
       console.warn('Failed to load sounds', e);
     }
   }
 
-  async play(soundName: 'squash' | 'powerup' | 'life-lost' | 'game-over') {
+  async play(soundName: 'squash' | 'powerup' | 'life-lost' | 'game-over' | 'laser' | 'explosion') {
     if (this.isMuted) return;
     
     try {

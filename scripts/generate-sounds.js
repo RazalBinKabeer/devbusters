@@ -94,10 +94,27 @@ const gameOver = generateSamples(0.8, (t) => {
   ) * env * 0.8;
 });
 
+// ── Laser: high descending sweep (Rocket Shooter) ──────────────────────
+const laser = generateSamples(0.15, (t, dur) => {
+  const freq = 1200 * Math.exp(-t * 15);
+  const env = Math.exp(-t * 10);
+  return (Math.sin(2 * Math.PI * freq * t) > 0 ? 0.3 : -0.3) * env; // Square wave for retro feel
+});
+
+// ── Explosion: white noise burst (Rocket Shooter) ──────────────────────
+const explosion = generateSamples(0.3, (t) => {
+  const env = Math.exp(-t * 12);
+  const noise = Math.random() * 2 - 1;
+  const rumble = Math.sin(2 * Math.PI * (50 + Math.random() * 50) * t);
+  return (noise * 0.6 + rumble * 0.4) * env;
+});
+
 // Write files
 fs.writeFileSync(path.join(soundsDir, 'squash.wav'), createWav(squash));
 fs.writeFileSync(path.join(soundsDir, 'powerup.wav'), createWav(powerup));
 fs.writeFileSync(path.join(soundsDir, 'life-lost.wav'), createWav(lifeLost));
 fs.writeFileSync(path.join(soundsDir, 'game-over.wav'), createWav(gameOver));
+fs.writeFileSync(path.join(soundsDir, 'laser.wav'), createWav(laser));
+fs.writeFileSync(path.join(soundsDir, 'explosion.wav'), createWav(explosion));
 
 console.log('✅ Sound effects generated in assets/sounds/');

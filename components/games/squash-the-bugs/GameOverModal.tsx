@@ -26,6 +26,8 @@ interface GameOverModalProps {
   isNewHighScore: boolean;
   onPlayAgain: () => void;
   onExit: () => void;
+  statLabel?: string;
+  statEmoji?: string;
 }
 
 export default function GameOverModal({
@@ -36,6 +38,8 @@ export default function GameOverModal({
   isNewHighScore,
   onPlayAgain,
   onExit,
+  statLabel = 'Squashed',
+  statEmoji = '🐛',
 }: GameOverModalProps) {
   const playBtnScale = useSharedValue(1);
   const crownBounce = useSharedValue(0);
@@ -86,9 +90,9 @@ export default function GameOverModal({
         {/* Stats grid */}
         <View style={styles.statsGrid}>
           <View style={styles.statItem}>
-            <Text style={styles.statEmoji}>🐛</Text>
+            <Text style={styles.statEmoji}>{statEmoji}</Text>
             <Text style={styles.statValue}>{bugsSquashed}</Text>
-            <Text style={styles.statLabel}>Squashed</Text>
+            <Text style={styles.statLabel}>{statLabel}</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>

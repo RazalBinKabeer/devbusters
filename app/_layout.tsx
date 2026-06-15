@@ -13,6 +13,8 @@ import { Fredoka_700Bold } from '@expo-google-fonts/fredoka';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { Colors } from '../constants/theme';
 
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+
 // Keep splash screen visible while loading fonts
 SplashScreen.preventAutoHideAsync();
 
@@ -25,7 +27,8 @@ function RootLayoutNav() {
     if (loading) return;
 
     const inAuthGroup = segments[0] === '(auth)';
-    const isWelcomeScreen = segments.length === 0 || segments[0] === '(index)' || segments[0] === 'index';
+    const segs = segments as string[];
+    const isWelcomeScreen = segs.length === 0 || segs[0] === '(index)' || segs[0] === 'index';
 
     if (user && (inAuthGroup || isWelcomeScreen)) {
       // User is signed in but on an auth/welcome screen — redirect to home
@@ -37,7 +40,7 @@ function RootLayoutNav() {
   }, [user, loading, segments]);
 
   return (
-    <>
+    <GestureHandlerRootView style={{ flex: 1 }}>
       <StatusBar style="light" />
       <Stack
         screenOptions={{
@@ -54,7 +57,7 @@ function RootLayoutNav() {
           options={{ animation: 'slide_from_bottom' }}
         />
       </Stack>
-    </>
+    </GestureHandlerRootView>
   );
 }
 

@@ -20,14 +20,14 @@ export const GAMES: GameData[] = [
   {
     id: 'rocket-shooter',
     title: 'Rocket Shooter',
-    subtitle: 'Blast those tickets away!',
+    subtitle: 'Shoot bugs, avoid blockers!',
     description:
-      'Shoot down Jira tickets, meeting invites, and Slack notifications with rocket bullets. Collect coffee ☕ and snacks 🍕 for power-ups!',
+      'Pilot your developer rocket to shoot down Jira tickets, endless meeting invites, and PR reviews. Grab coffee for rapid fire!',
     icon: '🚀',
-    accentColor: '#FF6B35',
+    accentColor: '#FFD23F',
     route: '/games/rocket-shooter',
     isLocked: false,
-    comingSoon: true,
+    comingSoon: false,
     tags: ['Action', 'Shooter'],
   },
   {

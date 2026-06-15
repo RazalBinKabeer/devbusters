@@ -40,6 +40,7 @@ export default function RocketShooterScreen() {
   
   const [renderTick, setRenderTick] = useState(0);
   const [gameArea, setGameArea] = useState({ width: 0, height: 0 });
+  const gameAreaRef = useRef({ width: 0, height: 0 });
   const [highScore, setHighScore] = useState(0);
 
   // ── Shared Values (UI Thread) ──────────────────────────────────────
@@ -161,7 +162,7 @@ export default function RocketShooterScreen() {
     lastTime.current = time;
 
     const now = Date.now();
-    const { width, height } = gameArea;
+    const { width, height } = gameAreaRef.current; // ALWAYS read from the ref to avoid stale closures!
     const playerRect = { x: playerX.value + 8, y: height - PLAYER_HEIGHT - 20, width: PLAYER_WIDTH - 16, height: PLAYER_HEIGHT - 16 };
     const isInvincible = now < invincibleUntil.current;
 
@@ -195,7 +196,7 @@ export default function RocketShooterScreen() {
       soundManager.play('laser');
       lastFireTime.current = now;
 
-      const bulletY = playerRect.y;
+      const bulletY = playerRect.y - 10;
       const bulletSpeed = -600;
 
       if (isSpread) {
@@ -359,7 +360,10 @@ export default function RocketShooterScreen() {
       {/* Game Area */}
       <Animated.View 
         style={[styles.gameArea, shakeStyle]}
-        onLayout={(e) => setGameArea(e.nativeEvent.layout)}
+        onLayout={(e) => {
+          setGameArea(e.nativeEvent.layout);
+          gameAreaRef.current = e.nativeEvent.layout;
+        }}
       >
         <Starfield gameHeight={gameArea.height} gameWidth={gameArea.width} />
 

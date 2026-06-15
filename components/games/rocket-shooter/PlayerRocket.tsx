@@ -40,7 +40,7 @@ export default function PlayerRocket({ x, y, width, height, gameWidth, isInvinci
           animatedStyle,
         ]}
       >
-        <Text style={[styles.emoji, { fontSize: width * 0.8 }]}>🚀</Text>
+        <Text style={[styles.emoji, { fontSize: width * 0.8, lineHeight: height, includeFontPadding: false, textAlignVertical: 'center' }]}>🚀</Text>
       </Animated.View>
     </GestureDetector>
   );

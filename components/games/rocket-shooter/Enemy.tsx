@@ -32,7 +32,7 @@ export default function Enemy({ enemy }: EnemyProps) {
         </View>
       )}
       
-      <Text style={[styles.emoji, { fontSize: enemy.width * 0.75 }]}>
+      <Text style={[styles.emoji, { fontSize: enemy.width * 0.75, lineHeight: enemy.height, includeFontPadding: false, textAlignVertical: 'center' }]}>
         {enemy.emoji}
       </Text>
     </View>

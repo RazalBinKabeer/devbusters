@@ -53,7 +53,7 @@ export const GAMES: GameData[] = [
     accentColor: '#7B2FF7',
     route: '/games/asset-destroy',
     isLocked: false,
-    comingSoon: true,
+    comingSoon: false,
     tags: ['Destruction', 'Rage'],
   },
   {

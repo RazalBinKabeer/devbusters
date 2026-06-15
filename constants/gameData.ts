@@ -79,7 +79,7 @@ export const GAMES: GameData[] = [
     accentColor: '#00D4AA',
     route: '/games/squash-the-bugs',
     isLocked: false,
-    comingSoon: true,
+    comingSoon: false,
     tags: ['Arcade', 'Tap'],
   },
 ];

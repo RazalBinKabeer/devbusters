@@ -25,13 +25,13 @@ function RootLayoutNav() {
     if (loading) return;
 
     const inAuthGroup = segments[0] === '(auth)';
-    const inTabsGroup = segments[0] === '(tabs)';
+    const isWelcomeScreen = segments.length === 0 || segments[0] === '(index)' || segments[0] === 'index';
 
-    if (user && !inTabsGroup) {
-      // User is signed in but not in tabs — redirect to home
+    if (user && (inAuthGroup || isWelcomeScreen)) {
+      // User is signed in but on an auth/welcome screen — redirect to home
       router.replace('/(tabs)');
-    } else if (!user && inTabsGroup) {
-      // User is not signed in but in tabs — redirect to welcome
+    } else if (!user && !inAuthGroup && !isWelcomeScreen) {
+      // User is not signed in but trying to access protected screens
       router.replace('/');
     }
   }, [user, loading, segments]);

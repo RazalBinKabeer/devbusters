@@ -14,6 +14,7 @@ import WeaponSelector from '../../components/games/asset-destroy/WeaponSelector'
 import BulletHole from '../../components/games/asset-destroy/BulletHole';
 import Svg, { Polyline } from 'react-native-svg';
 import { Fonts } from '../../constants/theme';
+import Animated, { useSharedValue, useAnimatedStyle, withSequence, withTiming } from 'react-native-reanimated';
 
 const { width, height } = Dimensions.get('window');
 
@@ -63,6 +64,18 @@ export default function AssetDestroyScreen() {
   const brokenHalvesRef = useRef<BrokenHalf[]>([]);
 
   const [bulletHoles, setBulletHoles] = useState<{ id: string; x: number; y: number }[]>([]);
+  const [floatingScores, setFloatingScores] = useState<{ id: string; x: number; y: number; text: string }[]>([]);
+
+  // Combo system
+  const [combo, setCombo] = useState(0);
+  const lastHitTimeRef = useRef(0);
+  const COMBO_WINDOW = 2000; // 2 seconds
+
+  // Screen shake
+  const shakeX = useSharedValue(0);
+  const shakeStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: shakeX.value }],
+  }));
 
   // Current swipe paths
   const strokesRef = useRef<Stroke[]>([]);
@@ -198,8 +211,41 @@ export default function AssetDestroyScreen() {
       else soundManager.play('slice');
       
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-      setScore(s => s + hitCount);
+
+      // Screen shake
+      shakeX.value = withSequence(
+        withTiming(-8, { duration: 40 }),
+        withTiming(8, { duration: 40 }),
+        withTiming(-5, { duration: 40 }),
+        withTiming(5, { duration: 40 }),
+        withTiming(0, { duration: 40 })
+      );
+
+      // Combo logic
+      const now = Date.now();
+      const timeSinceLast = now - lastHitTimeRef.current;
+      lastHitTimeRef.current = now;
+
+      let newCombo = 1;
+      if (timeSinceLast < COMBO_WINDOW && timeSinceLast > 0) {
+        setCombo(prev => {
+          newCombo = prev + 1;
+          return newCombo;
+        });
+      } else {
+        setCombo(1);
+        newCombo = 1;
+      }
+
+      const points = hitCount * Math.max(1, newCombo);
+      setScore(s => s + points);
       setTimeLeft(t => t + hitCount);
+
+      // Floating score popup
+      const floatId = Math.random().toString(36).substr(2, 9);
+      const label = newCombo > 1 ? `+${points} x${newCombo}!` : `+${hitCount}`;
+      setFloatingScores(prev => [...prev, { id: floatId, x: tx, y: ty, text: label }]);
+      setTimeout(() => setFloatingScores(prev => prev.filter(f => f.id !== floatId)), 800);
     }
   };
 
@@ -256,6 +302,9 @@ export default function AssetDestroyScreen() {
     brokenHalvesRef.current = [];
     strokesRef.current = [];
     setBulletHoles([]);
+    setFloatingScores([]);
+    setCombo(0);
+    lastHitTimeRef.current = 0;
     setScore(0);
     setTimeLeft(30);
     setGameState('playing');
@@ -270,9 +319,12 @@ export default function AssetDestroyScreen() {
       <Stack.Screen options={{ title: 'Asset Destroy', headerTransparent: true, headerTintColor: '#fff' }} />
       <GradientBackground colors={[Colors.bgDark, '#7B2FF7']}>
         <GestureDetector gesture={composedGesture}>
-          <View style={styles.container}>
+          <Animated.View style={[styles.container, shakeStyle]}>
             <View style={styles.topArea} pointerEvents="box-none">
               <TopBar timeLeft={timeLeft} score={score} />
+              {combo > 1 && (
+                <Text style={styles.comboText}>x{combo} COMBO!</Text>
+              )}
             </View>
 
             {/* Render Active Assets */}
@@ -307,6 +359,11 @@ export default function AssetDestroyScreen() {
             {/* Render Bullet Holes */}
             {bulletHoles.map(hole => (
               <BulletHole key={hole.id} id={hole.id} x={hole.x} y={hole.y} onComplete={removeBulletHole} />
+            ))}
+
+            {/* Floating Score Popups */}
+            {floatingScores.map(f => (
+              <FloatingScoreText key={f.id} x={f.x} y={f.y} text={f.text} />
             ))}
 
             {/* Render Fading Trails */}
@@ -352,7 +409,7 @@ export default function AssetDestroyScreen() {
                 onSelect={(w) => setSelectedWeapon(w as any)}
               />
             </View>
-          </View>
+          </Animated.View>
         </GestureDetector>
 
         {gameState === 'instructions' && (
@@ -393,6 +450,27 @@ export default function AssetDestroyScreen() {
   );
 }
 
+function FloatingScoreText({ x, y, text }: { x: number; y: number; text: string }) {
+  const translateY = useSharedValue(0);
+  const opacity = useSharedValue(1);
+
+  useEffect(() => {
+    translateY.value = withTiming(-80, { duration: 700 });
+    opacity.value = withTiming(0, { duration: 700 });
+  }, []);
+
+  const style = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+    opacity: opacity.value,
+  }));
+
+  return (
+    <Animated.View style={[{ position: 'absolute', left: x - 30, top: y - 20, zIndex: 500 }, style]}>
+      <Text style={{ fontFamily: Fonts.pixel, fontSize: 16, color: Colors.warning, textShadowColor: '#000', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 3 }}>{text}</Text>
+    </Animated.View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -402,8 +480,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-end',
     paddingBottom: 10,
-    paddingTop: 80, // Safe area for header
+    paddingTop: 80,
     zIndex: 100,
+  },
+  comboText: {
+    fontFamily: Fonts.pixel,
+    fontSize: 14,
+    color: Colors.warning,
+    marginTop: 5,
+    textShadowColor: '#000',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
   },
   bottomArea: {
     position: 'absolute',

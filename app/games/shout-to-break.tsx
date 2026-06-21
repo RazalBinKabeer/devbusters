@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, Text, TouchableOpacity, Dimensions } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { Stack, useRouter } from 'expo-router';
 import { Audio } from 'expo-av';
 import Animated, { 
@@ -38,6 +39,11 @@ export default function ShoutToBreakScreen() {
   
   const [isBroken, setIsBroken] = useState(false);
   const isBrokenRef = useRef(isBroken);
+
+  // Combo system
+  const [combo, setCombo] = useState(0);
+  const lastShatterTimeRef = useRef(0);
+  const COMBO_WINDOW = 4000; // 4 seconds to keep combo alive
 
   // Sync refs
   useEffect(() => {
@@ -104,6 +110,8 @@ export default function ShoutToBreakScreen() {
       setCurrentAssetIndex(0);
       setHealth(ASSETS[0].maxHealth);
       setIsBroken(false);
+      setCombo(0);
+      lastShatterTimeRef.current = 0;
       setGameState('playing');
 
       timerRef.current = setInterval(() => {
@@ -175,9 +183,32 @@ export default function ShoutToBreakScreen() {
 
   const shatterCurrentAsset = () => {
     setIsBroken(true);
-    isBrokenRef.current = true; // Synchronous guard against double shatters
+    isBrokenRef.current = true;
     soundManager.play('shatter');
-    setScore(s => s + 1);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    // Combo logic
+    const now = Date.now();
+    const timeSinceLast = now - lastShatterTimeRef.current;
+    lastShatterTimeRef.current = now;
+
+    let newCombo = 1;
+    if (timeSinceLast < COMBO_WINDOW && timeSinceLast > 0) {
+      setCombo(prev => {
+        newCombo = prev + 1;
+        return newCombo;
+      });
+    } else {
+      setCombo(1);
+      newCombo = 1;
+    }
+
+    // Score: base 1 * combo multiplier
+    const points = newCombo;
+    setScore(s => s + points);
+
+    // Time bonus: +5s per shatter
+    setTimeLeft(t => t + 5);
     
     // Animate break
     scaleValue.value = withSequence(
@@ -246,7 +277,18 @@ export default function ShoutToBreakScreen() {
             <Text style={styles.emoji}>
               {isBroken ? currentAsset.broken : currentAsset.emoji}
             </Text>
+            {/* Crack overlays */}
+            {!isBroken && healthPercentage <= 75 && (
+              <Text style={[styles.crackOverlay, { opacity: healthPercentage <= 25 ? 1 : healthPercentage <= 50 ? 0.7 : 0.4 }]}>
+                {healthPercentage <= 25 ? '💥' : healthPercentage <= 50 ? '⚡' : '🔸'}
+              </Text>
+            )}
           </Animated.View>
+
+          {/* Combo Display */}
+          {combo > 1 && (
+            <Text style={styles.comboText}>x{combo} COMBO!</Text>
+          )}
 
           {/* Volume Meter */}
           <View style={styles.meterContainer}>
@@ -374,6 +416,19 @@ const styles = StyleSheet.create({
   },
   emoji: {
     fontSize: 150,
+  },
+  crackOverlay: {
+    position: 'absolute',
+    fontSize: 60,
+  },
+  comboText: {
+    fontFamily: Fonts.pixel,
+    fontSize: 18,
+    color: Colors.warning,
+    marginBottom: 20,
+    textShadowColor: '#000',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
   },
   meterContainer: {
     width: '100%',

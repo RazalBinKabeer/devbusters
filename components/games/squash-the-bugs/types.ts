@@ -43,7 +43,7 @@ export interface PowerUpState {
 
 /** Top-level game state */
 export interface GameState {
-  status: 'ready' | 'playing' | 'gameOver';
+  status: 'ready' | 'playing' | 'gameOver' | 'paused';
   score: number;
   lives: number;
   maxLives: number;

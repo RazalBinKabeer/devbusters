@@ -12,8 +12,8 @@
  *   👀 Heisenbug — teleports every 1.5s, worth 100pts, costs 2 lives
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { StyleSheet, Text, View, Pressable, Dimensions } from 'react-native';
-import { useRouter } from 'expo-router';
+import { StyleSheet, Text, View, Pressable, AppState, TouchableOpacity } from 'react-native';
+import { useRouter, Stack, useNavigation } from 'expo-router';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -21,7 +21,6 @@ import Animated, {
   withTiming,
   FadeIn,
   FadeInDown,
-  FadeOut,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -33,6 +32,7 @@ import GameHUD from '../../components/games/squash-the-bugs/GameHUD';
 import PowerUpBar from '../../components/games/squash-the-bugs/PowerUpBar';
 import DangerZone from '../../components/games/squash-the-bugs/DangerZone';
 import GameOverModal from '../../components/games/squash-the-bugs/GameOverModal';
+import PauseModal from '../../components/games/PauseModal';
 import { BugData, SplatData, GameState } from '../../components/games/squash-the-bugs/types';
 import {
   BUG_CONFIGS,
@@ -60,11 +60,24 @@ const INITIAL_GAME_STATE: GameState = {
   startedAt: 0,
 };
 
+const STREAK_WINDOW = 1500; // 1.5 seconds between squashes to maintain streak
+
 export default function SquashTheBugsScreen() {
   const router = useRouter();
 
   // ── Core state ─────────────────────────────────────────────────────
+  const navigation = useNavigation();
   const [gameState, setGameState] = useState<GameState>(INITIAL_GAME_STATE);
+
+  // Intercept back gesture
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (currentGameStateRef.current !== 'playing') return;
+      e.preventDefault();
+      setGameState(prev => ({ ...prev, status: 'paused' }));
+    });
+    return unsubscribe;
+  }, [navigation]);
   const [bugs, setBugs] = useState<BugData[]>([]);
   const [splats, setSplats] = useState<SplatData[]>([]);
 
@@ -75,10 +88,31 @@ export default function SquashTheBugsScreen() {
   const [gitRevertRemaining, setGitRevertRemaining] = useState(0);
   const [gitBisectRemaining, setGitBisectRemaining] = useState(0);
 
+  // ── Streak system ──────────────────────────────────────────────────
+  const [streak, setStreak] = useState(0);
+  const lastSquashTimeRef = useRef(0);
+
   // ── Layout ─────────────────────────────────────────────────────────
   const [gameAreaSize, setGameAreaSize] = useState({ width: 0, height: 0 });
 
   // ── Refs (avoid stale closures in timers) ──────────────────────────
+  const currentGameStateRef = useRef(gameState.status);
+  
+  // AppState listener for auto-pause
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState.match(/inactive|background/) && currentGameStateRef.current === 'playing') {
+        setGameState(prev => ({ ...prev, status: 'paused' }));
+      }
+    });
+    return () => subscription.remove();
+  }, []);
+
+  // Update ref
+  useEffect(() => {
+    currentGameStateRef.current = gameState.status;
+  }, [gameState.status]);
+
   const gameStateRef = useRef(gameState);
   gameStateRef.current = gameState;
   const bugsRef = useRef(bugs);
@@ -191,6 +225,8 @@ export default function SquashTheBugsScreen() {
     setBugs([]);
     setSplats([]);
     setSlowMode(false);
+    setStreak(0);
+    lastSquashTimeRef.current = 0;
     setGitRevertLastUsed(0);
     setGitBisectLastUsed(0);
     setGitRevertRemaining(0);
@@ -229,10 +265,30 @@ export default function SquashTheBugsScreen() {
       const splatId = generateId();
       setSplats((prev) => [...prev, { id: splatId, x, y, emoji: '💥', createdAt: Date.now() }]);
 
+      // Streak logic
+      const now = Date.now();
+      const timeSinceLast = now - lastSquashTimeRef.current;
+      lastSquashTimeRef.current = now;
+
+      let currentStreak = 1;
+      if (timeSinceLast < STREAK_WINDOW && timeSinceLast > 0) {
+        setStreak(prev => {
+          currentStreak = prev + 1;
+          return currentStreak;
+        });
+      } else {
+        setStreak(1);
+        currentStreak = 1;
+      }
+
+      // Bonus points for streaks (double points at 3+, triple at 5+)
+      const multiplier = currentStreak >= 5 ? 3 : currentStreak >= 3 ? 2 : 1;
+      const totalPoints = points * multiplier;
+
       // Update score
       setGameState((prev) => ({
         ...prev,
-        score: prev.score + points,
+        score: prev.score + totalPoints,
         bugsSquashed: prev.bugsSquashed + 1,
       }));
 
@@ -332,6 +388,21 @@ export default function SquashTheBugsScreen() {
       colors={[Colors.bgDark, '#0A2A2A', Colors.bgDark]}
       style={styles.root}
     >
+      <Stack.Screen 
+        options={{ 
+          title: 'Squash the Bugs', 
+          headerTransparent: true, 
+          headerTintColor: '#fff',
+          headerRight: () => (
+            gameState.status === 'playing' ? (
+              <TouchableOpacity onPress={() => setGameState(prev => ({ ...prev, status: 'paused' }))} style={{ marginRight: 15 }}>
+                <Text style={{ fontSize: 24, color: '#FFF' }}>⏸️</Text>
+              </TouchableOpacity>
+            ) : null
+          )
+        }} 
+      />
+
       {/* HUD */}
       {gameState.status === 'playing' && (
         <GameHUD
@@ -339,7 +410,7 @@ export default function SquashTheBugsScreen() {
           lives={gameState.lives}
           maxLives={gameState.maxLives}
           difficulty={gameState.difficulty}
-          onPause={() => router.back()}
+          onPause={() => setGameState(prev => ({ ...prev, status: 'paused' }))}
         />
       )}
 
@@ -350,6 +421,15 @@ export default function SquashTheBugsScreen() {
       >
         {/* Slow mode overlay */}
         {slowMode && <View style={styles.slowOverlay} pointerEvents="none" />}
+
+        {/* Streak display */}
+        {streak >= 3 && gameState.status === 'playing' && (
+          <View style={styles.streakContainer}>
+            <Text style={styles.streakText}>x{streak} STREAK!</Text>
+            {streak >= 5 && <Text style={styles.streakBonus}>3x POINTS!</Text>}
+            {streak >= 3 && streak < 5 && <Text style={styles.streakBonus}>2x POINTS!</Text>}
+          </View>
+        )}
 
         {/* Bugs */}
         {bugs.map((bug) => (
@@ -440,6 +520,13 @@ export default function SquashTheBugsScreen() {
           onExit={() => router.back()}
         />
       )}
+
+      {/* Pause Modal */}
+      <PauseModal 
+        visible={gameState.status === 'paused'}
+        onResume={() => setGameState(prev => ({ ...prev, status: 'playing' }))}
+        onExit={() => router.back()}
+      />
     </LinearGradient>
   );
 }
@@ -456,6 +543,27 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(96, 165, 250, 0.08)',
     zIndex: 5,
+  },
+  streakContainer: {
+    position: 'absolute',
+    top: 10,
+    alignSelf: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  streakText: {
+    fontFamily: Fonts.pixel,
+    fontSize: 16,
+    color: Colors.warning,
+    textShadowColor: '#000',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
+  },
+  streakBonus: {
+    fontFamily: Fonts.pixel,
+    fontSize: 10,
+    color: Colors.accent,
+    marginTop: 2,
   },
   // ── Ready overlay ────────────────────────────────────────────────
   readyOverlay: {

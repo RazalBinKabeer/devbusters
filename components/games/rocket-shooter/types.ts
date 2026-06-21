@@ -54,7 +54,7 @@ export interface FloatingTextData {
 }
 
 export interface RSGameState {
-  status: 'ready' | 'playing' | 'gameOver';
+  status: 'ready' | 'playing' | 'gameOver' | 'paused';
   score: number;
   lives: number;
   maxLives: number;

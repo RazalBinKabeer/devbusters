@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { StyleSheet, Text, View, Pressable, Dimensions } from 'react-native';
-import { useRouter } from 'expo-router';
+import { StyleSheet, Text, View, Pressable, Dimensions, TouchableOpacity, AppState } from 'react-native';
+import { useRouter, Stack, useNavigation } from 'expo-router';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import GameHUD from '../../components/games/squash-the-bugs/GameHUD';
 import GameOverModal from '../../components/games/squash-the-bugs/GameOverModal';
+import PauseModal from '../../components/games/PauseModal';
 import BugSplat from '../../components/games/squash-the-bugs/BugSplat';
 import PlayerRocket from '../../components/games/rocket-shooter/PlayerRocket';
 import Enemy from '../../components/games/rocket-shooter/Enemy';
@@ -38,10 +39,34 @@ const BASE_FIRE_RATE = 350; // ms
 export default function RocketShooterScreen() {
   const router = useRouter();
   
+  const navigation = useNavigation();
+  const [gameState, setGameState] = useState<'ready' | 'playing' | 'gameOver' | 'paused'>('ready');
+
+  // Intercept back gesture
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (state.current.status !== 'playing') return;
+      e.preventDefault();
+      state.current.status = 'paused';
+      setGameState('paused');
+    });
+    return unsubscribe;
+  }, [navigation]);
   const [renderTick, setRenderTick] = useState(0);
   const [gameArea, setGameArea] = useState({ width: 0, height: 0 });
   const gameAreaRef = useRef({ width: 0, height: 0 });
   const [highScore, setHighScore] = useState(0);
+
+  // AppState listener for auto-pause
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState.match(/inactive|background/) && state.current.status === 'playing') {
+        state.current.status = 'paused';
+        setGameState('paused');
+      }
+    });
+    return () => subscription.remove();
+  }, []);
 
   // ── Shared Values (UI Thread) ──────────────────────────────────────
   const playerX = useSharedValue(0);
@@ -120,6 +145,8 @@ export default function RocketShooterScreen() {
     lastDiffTime.current = performance.now();
     invincibleUntil.current = 0;
     
+    state.current.status = 'playing';
+    setGameState('playing');
     setRenderTick(t => t + 1);
     
     if (rAF.current) cancelAnimationFrame(rAF.current);
@@ -128,6 +155,7 @@ export default function RocketShooterScreen() {
 
   const endGame = useCallback(() => {
     state.current.status = 'gameOver';
+    setGameState('gameOver');
     if (state.current.score > highScore) {
       setHighScore(state.current.score);
       AsyncStorage.setItem(HIGH_SCORE_KEY, state.current.score.toString());
@@ -339,20 +367,39 @@ export default function RocketShooterScreen() {
     opacity: screenFlashOpacity.value,
   }));
 
-  const isNewHighScore = state.current.score > highScore && state.current.status === 'gameOver';
+  const isNewHighScore = state.current.score > highScore && gameState === 'gameOver';
 
   return (
     <LinearGradient colors={[Colors.bgDark, '#050B14']} style={styles.root}>
+      <Stack.Screen 
+        options={{ 
+          title: 'Rocket Shooter', 
+          headerTransparent: true, 
+          headerTintColor: '#fff',
+          headerRight: () => (
+            gameState === 'playing' ? (
+              <TouchableOpacity onPress={() => {
+                state.current.status = 'paused';
+                setGameState('paused');
+              }} style={{ marginRight: 15 }}>
+                <Text style={{ fontSize: 24, color: '#FFF' }}>⏸️</Text>
+              </TouchableOpacity>
+            ) : null
+          )
+        }} 
+      />
+
       {/* HUD */}
-      {state.current.status === 'playing' && (
+      {gameState === 'playing' && (
         <GameHUD
           score={state.current.score}
           lives={state.current.lives}
           maxLives={state.current.maxLives}
           difficulty={state.current.difficulty}
           onPause={() => {
+            state.current.status = 'paused';
             if (rAF.current) cancelAnimationFrame(rAF.current);
-            router.back();
+            setGameState('paused');
           }}
         />
       )}
@@ -375,7 +422,7 @@ export default function RocketShooterScreen() {
           <Animated.View style={[styles.energyBar, energyBarStyle]} />
         </View>
 
-        {state.current.status === 'playing' && (
+        {(gameState === 'playing' || gameState === 'paused') && (
           <>
             {/* Projectiles */}
             {state.current.bullets.map(b => <Bullet key={b.id} bullet={b} />)}
@@ -417,7 +464,7 @@ export default function RocketShooterScreen() {
         )}
 
         {/* Ready Screen */}
-        {state.current.status === 'ready' && (
+        {gameState === 'ready' && (
           <Pressable style={styles.overlay} onPress={startGame}>
             <Animated.View entering={FadeInDown.duration(600)} style={styles.readyContent}>
               <Text style={styles.readyIcon}>🚀</Text>
@@ -443,7 +490,7 @@ export default function RocketShooterScreen() {
       </Animated.View>
 
       {/* Game Over Modal */}
-      {state.current.status === 'gameOver' && (
+      {gameState === 'gameOver' && (
         <GameOverModal
           score={state.current.score}
           highScore={Math.max(state.current.score, highScore)}
@@ -456,6 +503,17 @@ export default function RocketShooterScreen() {
           statEmoji="💥"
         />
       )}
+
+      {/* Pause Modal */}
+      <PauseModal 
+        visible={gameState === 'paused'}
+        onResume={() => {
+          state.current.status = 'playing';
+          setGameState('playing');
+          rAF.current = requestAnimationFrame(gameLoop);
+        }}
+        onExit={() => router.back()}
+      />
     </LinearGradient>
   );
 }

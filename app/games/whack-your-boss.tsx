@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Text, TouchableOpacity, TextInput, Dimensions, KeyboardAvoidingView, Platform } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
+import { View, StyleSheet, Text, TouchableOpacity, TextInput, Dimensions, KeyboardAvoidingView, Platform, AppState } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { Stack, useRouter, useNavigation } from 'expo-router';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
@@ -14,6 +15,7 @@ import { Colors, Fonts } from '../../constants/theme';
 import GradientBackground from '../../components/GradientBackground';
 import GameOverModal from '../../components/games/squash-the-bugs/GameOverModal';
 import { soundManager } from '../../utils/sounds';
+import PauseModal from '../../components/games/PauseModal';
 
 const { width } = Dimensions.get('window');
 
@@ -43,12 +45,23 @@ const OUCH_DIALOGUES = [
   "Aaargh!"
 ];
 
-type GameState = 'setup' | 'playing' | 'game-over';
+type GameState = 'setup' | 'playing' | 'game-over' | 'paused';
 
 export default function WhackYourBossScreen() {
   const router = useRouter();
   
+  const navigation = useNavigation();
   const [gameState, setGameState] = useState<GameState>('setup');
+
+  // Intercept back gesture
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (gameState !== 'playing') return;
+      e.preventDefault();
+      setGameState('paused');
+    });
+    return unsubscribe;
+  }, [navigation, gameState]);
   const [bossName, setBossName] = useState('');
   const [bossAvatar, setBossAvatar] = useState(BOSS_AVATARS[0]);
   
@@ -56,9 +69,20 @@ export default function WhackYourBossScreen() {
   const [activeHole, setActiveHole] = useState<number | null>(null);
   const [activeDialogue, setActiveDialogue] = useState<{ text: string, type: 'command' | 'pain' } | null>(null);
   const [score, setScore] = useState(0);
+  const [floatingScores, setFloatingScores] = useState<{id: string, x: number, y: number}[]>([]);
   
   const [maleVoice, setMaleVoice] = useState<string | undefined>();
   const [femaleVoice, setFemaleVoice] = useState<string | undefined>();
+
+  // AppState listener for auto-pause
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState.match(/inactive|background/) && gameState === 'playing') {
+        setGameState('paused');
+      }
+    });
+    return () => subscription.remove();
+  }, [gameState]);
 
   const gameLoopRef = useRef<any>(null);
 
@@ -90,10 +114,46 @@ export default function WhackYourBossScreen() {
     loadVoices();
 
     return () => {
-      if (gameLoopRef.current) clearInterval(gameLoopRef.current);
+      if (gameLoopRef.current) clearTimeout(gameLoopRef.current);
       Speech.stop();
     };
   }, []);
+
+  // Difficulty ramp: as frustration drops, boss gets faster
+  const frustrationRef = useRef(frustration);
+  useEffect(() => { frustrationRef.current = frustration; }, [frustration]);
+
+  const spawnBoss = () => {
+    const frust = frustrationRef.current;
+    // Boss speed ramps: interval shrinks from 1500ms to 800ms, visible window from 900ms to 450ms
+    const interval = Math.max(800, 1500 - (100 - frust) * 7);
+    const visibleDuration = Math.max(450, 900 - (100 - frust) * 4.5);
+
+    const randomHole = Math.floor(Math.random() * TOTAL_HOLES);
+    setActiveHole(randomHole);
+
+    // Say annoying text
+    if (Math.random() > 0.4) {
+      const text = ANNOYING_DIALOGUES[Math.floor(Math.random() * ANNOYING_DIALOGUES.length)];
+      setActiveDialogue({ text, type: 'command' });
+
+      const isFemale = FEMALE_AVATARS.includes(bossAvatar);
+      const isMale = MALE_AVATARS.includes(bossAvatar);
+      const voiceId = isFemale ? femaleVoice : isMale ? maleVoice : undefined;
+      const pitch = isFemale ? 1.1 : isMale ? 0.6 : 1.0;
+      Speech.speak(text, { pitch, rate: 1.0, voice: voiceId });
+    } else {
+      setActiveDialogue(null);
+    }
+
+    // Hide after visible duration
+    setTimeout(() => {
+      setActiveHole((current) => (current === randomHole ? null : current));
+    }, visibleDuration);
+
+    // Schedule next spawn
+    gameLoopRef.current = setTimeout(spawnBoss, interval);
+  };
 
   const startGame = () => {
     if (!bossName.trim()) {
@@ -101,62 +161,48 @@ export default function WhackYourBossScreen() {
     }
     setFrustration(100);
     setScore(0);
+    setFloatingScores([]);
     setGameState('playing');
-    
-    // Start mole loop
-    gameLoopRef.current = setInterval(() => {
-      // Pick a random hole
-      const randomHole = Math.floor(Math.random() * TOTAL_HOLES);
-      setActiveHole(randomHole);
-      
-      // Say annoying text
-      if (Math.random() > 0.4) {
-        const text = ANNOYING_DIALOGUES[Math.floor(Math.random() * ANNOYING_DIALOGUES.length)];
-        setActiveDialogue({ text, type: 'command' });
-        
-        const isFemale = FEMALE_AVATARS.includes(bossAvatar);
-        const isMale = MALE_AVATARS.includes(bossAvatar);
-        const voiceId = isFemale ? femaleVoice : isMale ? maleVoice : undefined;
-        // Adjust pitch if voice isn't found
-        const pitch = isFemale ? 1.1 : isMale ? 0.6 : 1.0;
-        
-        Speech.speak(text, { pitch, rate: 1.0, voice: voiceId });
-      } else {
-        setActiveDialogue(null);
-      }
-      
-      // Hide after a short duration
-      setTimeout(() => {
-        setActiveHole((current) => (current === randomHole ? null : current));
-      }, 900);
-    }, 1500);
+
+    // Kick off recursive spawn
+    gameLoopRef.current = setTimeout(spawnBoss, 1000);
   };
 
   const endGame = () => {
     setGameState('game-over');
     Speech.stop();
-    if (gameLoopRef.current) clearInterval(gameLoopRef.current);
+    soundManager.play('game-over');
+    if (gameLoopRef.current) clearTimeout(gameLoopRef.current);
   };
 
   const whack = (holeIndex: number) => {
     if (holeIndex !== activeHole || gameState !== 'playing') return;
-    
+
     soundManager.play('smack');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     Speech.stop();
     const ouchText = OUCH_DIALOGUES[Math.floor(Math.random() * OUCH_DIALOGUES.length)];
     setActiveDialogue({ text: ouchText, type: 'pain' });
-    
+
     const isFemale = FEMALE_AVATARS.includes(bossAvatar);
     const isMale = MALE_AVATARS.includes(bossAvatar);
     const voiceId = isFemale ? femaleVoice : isMale ? maleVoice : undefined;
-    
-    // Very distinct pain voice: much higher pitch and faster rate
     const pitch = isFemale ? 1.8 : isMale ? 0.9 : 1.6;
-    
     Speech.speak(ouchText, { pitch, rate: 1.5, voice: voiceId });
-    
+
     setScore(s => s + 1);
-    setActiveHole(null); // Hide immediately
+    setActiveHole(null);
+
+    // Floating score popup
+    const floatId = Math.random().toString(36).substr(2, 9);
+    // Calculate position based on grid cell
+    const col = holeIndex % GRID_SIZE;
+    const row = Math.floor(holeIndex / GRID_SIZE);
+    const cellSize = (width * 0.9 - 30) / 3;
+    const fx = col * (cellSize + 15) + cellSize / 2;
+    const fy = row * (cellSize + 15) + cellSize / 2;
+    setFloatingScores(prev => [...prev, { id: floatId, x: fx, y: fy }]);
+    setTimeout(() => setFloatingScores(prev => prev.filter(f => f.id !== floatId)), 800);
 
     setFrustration(prev => {
       const next = Math.max(0, prev - 10);
@@ -209,7 +255,7 @@ export default function WhackYourBossScreen() {
     <View style={styles.gameContainer}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => {
-          if (gameLoopRef.current) clearInterval(gameLoopRef.current);
+          if (gameLoopRef.current) clearTimeout(gameLoopRef.current);
           router.back();
         }} style={styles.backBtn}>
           <Text style={styles.backText}>◀</Text>
@@ -221,6 +267,14 @@ export default function WhackYourBossScreen() {
             <View style={[styles.frustrationBarFill, { width: `${frustration}%` }]} />
           </View>
         </View>
+
+        {gameState === 'playing' ? (
+          <TouchableOpacity onPress={() => setGameState('paused')} style={styles.pauseBtn}>
+            <Text style={{ fontSize: 24, color: '#FFF' }}>⏸️</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 40 }} />
+        )}
       </View>
 
       <Text style={styles.targetName}>Target: {bossName || 'The Boss'}</Text>
@@ -257,7 +311,22 @@ export default function WhackYourBossScreen() {
             )}
           </TouchableOpacity>
         ))}
+
+        {/* Floating score popups */}
+        {floatingScores.map(f => (
+          <FloatingScore key={f.id} x={f.x} y={f.y} />
+        ))}
       </View>
+
+      {/* Pause Modal */}
+      <PauseModal 
+        visible={gameState === 'paused'}
+        onResume={() => setGameState('playing')}
+        onExit={() => {
+          if (gameLoopRef.current) clearTimeout(gameLoopRef.current);
+          router.back();
+        }}
+      />
     </View>
   );
 
@@ -266,7 +335,7 @@ export default function WhackYourBossScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <GradientBackground colors={[Colors.bgDark, Colors.bgLight]} style={styles.container}>
         {gameState === 'setup' && renderSetup()}
-        {gameState === 'playing' && renderGame()}
+        {(gameState === 'playing' || gameState === 'paused') && renderGame()}
         {gameState === 'game-over' && (
           <GameOverModal
             score={score}
@@ -300,6 +369,27 @@ function AnimatedBoss({ avatar }: { avatar: string }) {
   return (
     <Animated.View style={[styles.bossContainer, animatedStyle]}>
       <Text style={styles.bossEmoji}>{avatar}</Text>
+    </Animated.View>
+  );
+}
+
+function FloatingScore({ x, y }: { x: number; y: number }) {
+  const translateY = useSharedValue(0);
+  const opacity = useSharedValue(1);
+
+  useEffect(() => {
+    translateY.value = withTiming(-60, { duration: 700 });
+    opacity.value = withTiming(0, { duration: 700 });
+  }, []);
+
+  const style = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+    opacity: opacity.value,
+  }));
+
+  return (
+    <Animated.View style={[{ position: 'absolute', left: x - 20, top: y - 10 }, style]}>
+      <Text style={{ fontFamily: Fonts.pixel, fontSize: 18, color: Colors.warning, textShadowColor: '#000', textShadowOffset: { width: 1, height: 1 }, textShadowRadius: 3 }}>+1</Text>
     </Animated.View>
   );
 }
@@ -413,6 +503,15 @@ const styles = StyleSheet.create({
   backText: {
     color: '#FFF',
     fontSize: 20,
+  },
+  pauseBtn: {
+    width: 40,
+    height: 40,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 15,
   },
   frustrationContainer: {
     flex: 1,

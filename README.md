@@ -15,11 +15,11 @@ DevBusters is a vibrant, comic-themed developer stress-relief gaming platform bu
    - _Goal_: Control a developer rocket to shoot down oncoming Jira tickets, endless meetings, blocker issues, and alerts.
    - _Collectibles_: Collect snacks, coffee cups, and energy drinks to power up your weapons.
 3. **Assets Destroy** 🔨
-   - _Goal_: Relieve hardware frustration! Destroy computer screens, mechanical keyboards, mice, and office chairs using baseball bats, fists, hammers, or guns.
+   - _Goal_: Relieve hardware frustration! Slice falling assets using a Sword (Fruit Ninja style with glowing trails) or blast them with a Gun (leaving bullet holes).
 4. **Whack Your Boss** 🧑‍💼
-   - _Goal_: Select or customize a boss avatar (name, gender, appearance) and whack them as much as you need until your frustration levels drop to zero.
+   - _Goal_: Select an annoying boss avatar, name them, and whack them to relieve your frustration meter while they yell toxic workplace quotes at you.
 5. **Shout to Break** 🗣️
-   - _Goal_: Use your microphone's input level (shouting noises) to shatter windows, wine glasses, monitors, and plates.
+   - _Goal_: Use your microphone's input level (shouting noises) to shatter windows, wine glasses, monitors, and ancient pots.
 
 ---
 
@@ -131,3 +131,37 @@ _Note: Always update `DevBusters.apk` in the repository root if you make signifi
 - [x] **Phase 2**: Mini-game implementations (_Squash the Bugs_, _Rocket Shooter_, _Asset Destroy_, _Whack Your Boss_).
 - [x] **Phase 3**: Integration of Native Device features (Microphone API for _Shout to Break_, Haptics, Text-to-Speech, and sound effects).
 - [ ] **Phase 4**: Leaderboard systems, Firebase Firestore database persistence, and social share integrations.
+
+---
+
+## 🛠️ How We Made the Games
+
+DevBusters is built to provide high-performance, 60fps interactive gameplay without relying on heavy game engines like Unity. We achieved this by pushing the limits of React Native's animation and gesture APIs.
+
+### 1. Squash the Bugs 🐛
+- **Animations:** Utilized `react-native-reanimated`'s `useSharedValue` and `withTiming` to animate the Y-axis descent of the bugs.
+- **State Management:** A custom hook manages the active bugs, dynamically pushing new bugs to an array with randomized horizontal positions and speeds.
+- **Interaction:** Tapping a bug triggers an instantaneous state update and plays a generated "squash" pop sound via `expo-av`.
+
+### 2. Rocket Shooter 🚀
+- **Game Loop:** Implemented a custom game loop using `requestAnimationFrame` and React `useRef`s to continuously update the positions of the rocket, bullets, and enemies at 60fps.
+- **Collision Detection:** AABB (Axis-Aligned Bounding Box) collision checks inside the loop detect when a bullet hits an enemy.
+- **Synthesized Audio:** The laser and explosion sounds were procedurally generated using math functions (sine waves and white noise) mapped into a 16-bit PCM WAV buffer script (`generate-sounds.js`), giving it an authentic retro feel.
+
+### 3. Asset Destroy 🔨
+- **Physics Engine:** Constructed a physics-based `requestAnimationFrame` engine that handles gravity, parabolic projectile motion, and dynamic bounds.
+- **Sword (Swipe):** Inspired by *Fruit Ninja*, we used `react-native-gesture-handler`'s `Gesture.Pan`. As the finger drags, we capture coordinates and render a glowing trailing light effect using `react-native-svg`.
+- **Gun (Tap):** Uses `Gesture.Tap` to instantiate immediate bullet holes (💢) at tap coordinates, which slowly fade out using Reanimated Opacity transitions.
+
+### 4. Shout to Break 🗣️
+- **Microphone Metering:** Integrated `expo-av`'s `Audio.Recording` module. We enabled `isMeteringEnabled: true` to stream live decibel levels (-160dB to 0dB) at a 50ms interval.
+- **Damage Mapping:** Negative decibel values are normalized into a 0 to 1 scale. If the volume exceeds a threshold, we apply damage.
+- **Visual Feedback:** Reanimated `withSequence` and `withTiming` make the asset wildly shake (`translateX/Y`) and pulse (`scale`) proportional to the decibel input.
+- **Closure Architecture:** Because the audio listener acts asynchronously outside the React render cycle, we utilized `useRef` to maintain synchronous access to the live game state.
+
+### 5. Whack Your Boss 🧑‍💼
+- **Grid System:** A 3x3 grid where a randomized `setInterval` loop updates an `activeHole` state, causing the boss to pop up for short intervals.
+- **Advanced Text-to-Speech (TTS):** Integrated `expo-speech` to add auditory life to the boss.
+  - **Dynamic Gender Matching:** `Speech.getAvailableVoicesAsync()` fetches native voices. We actively filter for IDs and names like "Samantha" (Female) and "Arthur" (Male).
+  - **Command Dialogues:** The boss drops toxic workplace quotes at a normal rate. If a native gendered voice isn't found, we aggressively drop the pitch modifier (`0.6`) to force a masculine tone.
+  - **Pain/Attack Dialogues:** When you whack the boss, previous speech is cut off (`Speech.stop()`). They yelp in pain accompanied by a red, pixelated speech bubble. The TTS engine spikes the pitch modifier (up to `1.8`) and speed rate (`1.5`) to simulate an authentic yelp.

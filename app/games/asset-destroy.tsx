@@ -70,7 +70,7 @@ export default function AssetDestroyScreen() {
 
   const timerRef = useRef<any>(null);
   const spawnRef = useRef<any>(null);
-  const requestRef = useRef<number>();
+  const requestRef = useRef<any>(null);
 
   useEffect(() => {
     soundManager.init();
@@ -427,7 +427,7 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   instructionCard: {
-    backgroundColor: Colors.bgMedium,
+    backgroundColor: Colors.bgCard,
     padding: 30,
     borderRadius: 20,
     alignItems: 'center',
@@ -443,7 +443,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   instructionText: {
-    fontFamily: Fonts.regular,
+    fontFamily: Fonts.body,
     fontSize: 18,
     color: '#CCC',
     marginBottom: 20,

@@ -40,7 +40,7 @@ export const GAMES: GameData[] = [
     accentColor: '#FF3366',
     route: '/games/shout-to-break',
     isLocked: false,
-    comingSoon: true,
+    comingSoon: false,
     tags: ['Voice', 'Destruction'],
   },
   {

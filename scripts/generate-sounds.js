@@ -126,6 +126,15 @@ const gunfire = generateSamples(0.15, (t) => {
   return (noise * 0.5 + bang * 0.5) * env;
 });
 
+// ── Shatter (Glass/Window) ──────────────────────
+const shatter = generateSamples(0.4, (t) => {
+  const env = Math.exp(-t * 10);
+  const noise = (Math.random() * 2 - 1) * 0.8;
+  const tinkle1 = Math.sin(2 * Math.PI * 4000 * t) * 0.1 * Math.exp(-t * 5);
+  const tinkle2 = Math.sin(2 * Math.PI * 6500 * t) * 0.1 * Math.exp(-t * 8);
+  return (noise + tinkle1 + tinkle2) * env;
+});
+
 // Write files
 fs.writeFileSync(path.join(soundsDir, 'squash.wav'), createWav(squash));
 fs.writeFileSync(path.join(soundsDir, 'powerup.wav'), createWav(powerup));
@@ -135,5 +144,6 @@ fs.writeFileSync(path.join(soundsDir, 'laser.wav'), createWav(laser));
 fs.writeFileSync(path.join(soundsDir, 'explosion.wav'), createWav(explosion));
 fs.writeFileSync(path.join(soundsDir, 'slice.wav'), createWav(slice));
 fs.writeFileSync(path.join(soundsDir, 'gunfire.wav'), createWav(gunfire));
+fs.writeFileSync(path.join(soundsDir, 'shatter.wav'), createWav(shatter));
 
 console.log('✅ Sound effects generated in assets/sounds/');

@@ -109,19 +109,21 @@ const explosion = generateSamples(0.3, (t) => {
   return (noise * 0.6 + rumble * 0.4) * env;
 });
 
-// ── Smack: Thud sound (Asset Destroy) ──────────────────────
-const smack = generateSamples(0.15, (t) => {
-  const env = Math.exp(-t * 20);
-  const rumble = Math.sin(2 * Math.PI * (80 + Math.random() * 20) * t);
-  return rumble * env * 0.8;
+// ── Slice (Sword) ──────────────────────
+const slice = generateSamples(0.2, (t) => {
+  const env = Math.exp(-t * 25);
+  // High pitched sweeping sound
+  const freq = 1500 - 1000 * (t / 0.2);
+  const swoop = Math.sin(2 * Math.PI * freq * t);
+  const noise = Math.random() * 2 - 1;
+  return (swoop * 0.7 + noise * 0.3) * env * 0.8;
 });
 
-// ── Shatter: High pitched noise burst (Asset Destroy) ──────────────────────
-const shatter = generateSamples(0.4, (t) => {
-  const env = Math.exp(-t * 8);
+const gunfire = generateSamples(0.15, (t) => {
+  const env = Math.exp(-t * 30);
   const noise = Math.random() * 2 - 1;
-  const highPitch = Math.sin(2 * Math.PI * (2000 + Math.random() * 500) * t);
-  return (noise * 0.7 + highPitch * 0.3) * env * 0.6;
+  const bang = Math.sin(2 * Math.PI * (150 + Math.random() * 50) * t);
+  return (noise * 0.5 + bang * 0.5) * env;
 });
 
 // Write files
@@ -131,7 +133,7 @@ fs.writeFileSync(path.join(soundsDir, 'life-lost.wav'), createWav(lifeLost));
 fs.writeFileSync(path.join(soundsDir, 'game-over.wav'), createWav(gameOver));
 fs.writeFileSync(path.join(soundsDir, 'laser.wav'), createWav(laser));
 fs.writeFileSync(path.join(soundsDir, 'explosion.wav'), createWav(explosion));
-fs.writeFileSync(path.join(soundsDir, 'smack.wav'), createWav(smack));
-fs.writeFileSync(path.join(soundsDir, 'shatter.wav'), createWav(shatter));
+fs.writeFileSync(path.join(soundsDir, 'slice.wav'), createWav(slice));
+fs.writeFileSync(path.join(soundsDir, 'gunfire.wav'), createWav(gunfire));
 
 console.log('✅ Sound effects generated in assets/sounds/');

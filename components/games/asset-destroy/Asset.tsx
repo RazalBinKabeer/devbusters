@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withSequence, withTiming, withSpring } from 'react-native-reanimated';
 import { TargetAsset } from './types';
+import { Colors } from '../../../constants/theme';
 
 interface Props {
   asset: TargetAsset;
@@ -15,7 +16,7 @@ export default function Asset({ asset, health }: Props) {
   const prevHealth = React.useRef(health);
 
   useEffect(() => {
-    if (health < prevHealth.current) {
+    if (health < prevHealth.current && health > 0) {
       shake.value = withSequence(
         withTiming(15, { duration: 40 }),
         withTiming(-15, { duration: 40 }),
@@ -38,15 +39,24 @@ export default function Asset({ asset, health }: Props) {
   }));
 
   const isBroken = health <= 0;
+  const percentage = Math.max(0, (health / asset.maxHealth) * 100);
 
   return (
-    <Animated.View style={[styles.container, animatedStyle]}>
-      <Text style={styles.emoji}>{isBroken ? '💥' : asset.emoji}</Text>
-    </Animated.View>
+    <View style={styles.wrapper}>
+      <Animated.View style={[styles.container, animatedStyle]}>
+        <Text style={styles.emoji}>{isBroken ? '💥' : asset.emoji}</Text>
+      </Animated.View>
+      <View style={styles.healthBarBg}>
+        <View style={[styles.healthBarFill, { width: `${percentage}%`, backgroundColor: percentage > 50 ? Colors.accent : percentage > 20 ? Colors.warning : Colors.danger }]} />
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  wrapper: {
+    alignItems: 'center',
+  },
   container: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -58,5 +68,18 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.5)',
     textShadowOffset: { width: 4, height: 4 },
     textShadowRadius: 10,
+  },
+  healthBarBg: {
+    width: 100,
+    height: 10,
+    backgroundColor: '#333',
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#000',
+    marginTop: -20,
+    overflow: 'hidden',
+  },
+  healthBarFill: {
+    height: '100%',
   }
 });

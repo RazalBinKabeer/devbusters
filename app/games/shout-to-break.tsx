@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Text, TouchableOpacity, Dimensions } from 'react-native';
+import { View, StyleSheet, Text, TouchableOpacity, Dimensions, AppState } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, useNavigation } from 'expo-router';
 import { Audio } from 'expo-av';
 import Animated, { 
   useSharedValue, 
@@ -15,6 +15,7 @@ import Animated, {
 import { Colors, Fonts } from '../../constants/theme';
 import GradientBackground from '../../components/GradientBackground';
 import GameOverModal from '../../components/games/squash-the-bugs/GameOverModal';
+import PauseModal from '../../components/games/PauseModal';
 import { soundManager } from '../../utils/sounds';
 
 const { width } = Dimensions.get('window');
@@ -28,7 +29,18 @@ const ASSETS = [
 
 export default function ShoutToBreakScreen() {
   const router = useRouter();
-  const [gameState, setGameState] = useState<'instructions' | 'playing' | 'game-over'>('instructions');
+  const navigation = useNavigation();
+  const [gameState, setGameState] = useState<'instructions' | 'playing' | 'game-over' | 'paused'>('instructions');
+
+  // Intercept back gesture
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (gameState !== 'playing') return;
+      e.preventDefault();
+      setGameState('paused');
+    });
+    return unsubscribe;
+  }, [navigation, gameState]);
   const gameStateRef = useRef(gameState);
   
   const [score, setScore] = useState(0);
@@ -39,6 +51,16 @@ export default function ShoutToBreakScreen() {
   
   const [isBroken, setIsBroken] = useState(false);
   const isBrokenRef = useRef(isBroken);
+
+  // AppState listener for auto-pause
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState.match(/inactive|background/) && gameStateRef.current === 'playing') {
+        setGameState('paused');
+      }
+    });
+    return () => subscription.remove();
+  }, []);
 
   // Combo system
   const [combo, setCombo] = useState(0);
@@ -245,14 +267,24 @@ export default function ShoutToBreakScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ headerShown: false }} />
+      <Stack.Screen 
+        options={{ 
+          title: 'Shout to Break',
+          headerTransparent: true,
+          headerTintColor: '#fff',
+          headerRight: () => (
+            gameState === 'playing' ? (
+              <TouchableOpacity onPress={() => setGameState('paused')} style={{ marginRight: 15 }}>
+                <Text style={{ fontSize: 24, color: '#FFF' }}>⏸️</Text>
+              </TouchableOpacity>
+            ) : null
+          )
+        }} 
+      />
       <GradientBackground colors={['#1a0b2e', '#4b1d52']} style={styles.container}>
         
-        {/* Top Bar */}
+        {/* Top Bar Stats */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Text style={styles.backText}>◀</Text>
-          </TouchableOpacity>
           <View style={styles.statsBox}>
             <Text style={styles.statsLabel}>SCORE</Text>
             <Text style={styles.statsValue}>{score}</Text>
@@ -334,6 +366,13 @@ export default function ShoutToBreakScreen() {
             isNewHighScore={false}
           />
         )}
+
+        {/* Pause Modal */}
+        <PauseModal 
+          visible={gameState === 'paused'}
+          onResume={() => setGameState('playing')}
+          onExit={() => router.back()}
+        />
       </GradientBackground>
     </>
   );
@@ -345,24 +384,12 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    gap: 40,
     paddingHorizontal: 20,
-    paddingTop: 60,
+    paddingTop: 100,
     paddingBottom: 20,
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.3)',
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  backText: {
-    color: '#FFF',
-    fontSize: 20,
   },
   statsBox: {
     alignItems: 'center',

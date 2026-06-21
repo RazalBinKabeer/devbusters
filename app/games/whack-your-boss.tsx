@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Text, TouchableOpacity, TextInput, Dimensions, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, StyleSheet, Text, TouchableOpacity, TextInput, Dimensions, KeyboardAvoidingView, Platform, AppState } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, useNavigation } from 'expo-router';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
@@ -15,6 +15,7 @@ import { Colors, Fonts } from '../../constants/theme';
 import GradientBackground from '../../components/GradientBackground';
 import GameOverModal from '../../components/games/squash-the-bugs/GameOverModal';
 import { soundManager } from '../../utils/sounds';
+import PauseModal from '../../components/games/PauseModal';
 
 const { width } = Dimensions.get('window');
 
@@ -44,12 +45,23 @@ const OUCH_DIALOGUES = [
   "Aaargh!"
 ];
 
-type GameState = 'setup' | 'playing' | 'game-over';
+type GameState = 'setup' | 'playing' | 'game-over' | 'paused';
 
 export default function WhackYourBossScreen() {
   const router = useRouter();
   
+  const navigation = useNavigation();
   const [gameState, setGameState] = useState<GameState>('setup');
+
+  // Intercept back gesture
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (gameState !== 'playing') return;
+      e.preventDefault();
+      setGameState('paused');
+    });
+    return unsubscribe;
+  }, [navigation, gameState]);
   const [bossName, setBossName] = useState('');
   const [bossAvatar, setBossAvatar] = useState(BOSS_AVATARS[0]);
   
@@ -61,6 +73,16 @@ export default function WhackYourBossScreen() {
   
   const [maleVoice, setMaleVoice] = useState<string | undefined>();
   const [femaleVoice, setFemaleVoice] = useState<string | undefined>();
+
+  // AppState listener for auto-pause
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState.match(/inactive|background/) && gameState === 'playing') {
+        setGameState('paused');
+      }
+    });
+    return () => subscription.remove();
+  }, [gameState]);
 
   const gameLoopRef = useRef<any>(null);
 
@@ -245,6 +267,14 @@ export default function WhackYourBossScreen() {
             <View style={[styles.frustrationBarFill, { width: `${frustration}%` }]} />
           </View>
         </View>
+
+        {gameState === 'playing' ? (
+          <TouchableOpacity onPress={() => setGameState('paused')} style={styles.pauseBtn}>
+            <Text style={{ fontSize: 24, color: '#FFF' }}>⏸️</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 40 }} />
+        )}
       </View>
 
       <Text style={styles.targetName}>Target: {bossName || 'The Boss'}</Text>
@@ -287,6 +317,16 @@ export default function WhackYourBossScreen() {
           <FloatingScore key={f.id} x={f.x} y={f.y} />
         ))}
       </View>
+
+      {/* Pause Modal */}
+      <PauseModal 
+        visible={gameState === 'paused'}
+        onResume={() => setGameState('playing')}
+        onExit={() => {
+          if (gameLoopRef.current) clearTimeout(gameLoopRef.current);
+          router.back();
+        }}
+      />
     </View>
   );
 
@@ -295,7 +335,7 @@ export default function WhackYourBossScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <GradientBackground colors={[Colors.bgDark, Colors.bgLight]} style={styles.container}>
         {gameState === 'setup' && renderSetup()}
-        {gameState === 'playing' && renderGame()}
+        {(gameState === 'playing' || gameState === 'paused') && renderGame()}
         {gameState === 'game-over' && (
           <GameOverModal
             score={score}
@@ -463,6 +503,15 @@ const styles = StyleSheet.create({
   backText: {
     color: '#FFF',
     fontSize: 20,
+  },
+  pauseBtn: {
+    width: 40,
+    height: 40,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 15,
   },
   frustrationContainer: {
     flex: 1,

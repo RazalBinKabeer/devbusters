@@ -109,6 +109,40 @@ const explosion = generateSamples(0.3, (t) => {
   return (noise * 0.6 + rumble * 0.4) * env;
 });
 
+// ── Slice (Sword) ──────────────────────
+const slice = generateSamples(0.2, (t) => {
+  const env = Math.exp(-t * 25);
+  // High pitched sweeping sound
+  const freq = 1500 - 1000 * (t / 0.2);
+  const swoop = Math.sin(2 * Math.PI * freq * t);
+  const noise = Math.random() * 2 - 1;
+  return (swoop * 0.7 + noise * 0.3) * env * 0.8;
+});
+
+const gunfire = generateSamples(0.15, (t) => {
+  const env = Math.exp(-t * 30);
+  const noise = Math.random() * 2 - 1;
+  const bang = Math.sin(2 * Math.PI * (150 + Math.random() * 50) * t);
+  return (noise * 0.5 + bang * 0.5) * env;
+});
+
+// ── Shatter (Glass/Window) ──────────────────────
+const shatter = generateSamples(0.4, (t) => {
+  const env = Math.exp(-t * 10);
+  const noise = (Math.random() * 2 - 1) * 0.8;
+  const tinkle1 = Math.sin(2 * Math.PI * 4000 * t) * 0.1 * Math.exp(-t * 5);
+  const tinkle2 = Math.sin(2 * Math.PI * 6500 * t) * 0.1 * Math.exp(-t * 8);
+  return (noise + tinkle1 + tinkle2) * env;
+});
+
+// ── Smack (Whack Your Boss) ──────────────────────
+const smack = generateSamples(0.2, (t) => {
+  const env = Math.exp(-t * 30);
+  const noise = (Math.random() * 2 - 1) * 0.4;
+  const thud = Math.sin(2 * Math.PI * 100 * t) * 0.6;
+  return (noise + thud) * env;
+});
+
 // Write files
 fs.writeFileSync(path.join(soundsDir, 'squash.wav'), createWav(squash));
 fs.writeFileSync(path.join(soundsDir, 'powerup.wav'), createWav(powerup));
@@ -116,5 +150,9 @@ fs.writeFileSync(path.join(soundsDir, 'life-lost.wav'), createWav(lifeLost));
 fs.writeFileSync(path.join(soundsDir, 'game-over.wav'), createWav(gameOver));
 fs.writeFileSync(path.join(soundsDir, 'laser.wav'), createWav(laser));
 fs.writeFileSync(path.join(soundsDir, 'explosion.wav'), createWav(explosion));
+fs.writeFileSync(path.join(soundsDir, 'slice.wav'), createWav(slice));
+fs.writeFileSync(path.join(soundsDir, 'gunfire.wav'), createWav(gunfire));
+fs.writeFileSync(path.join(soundsDir, 'shatter.wav'), createWav(shatter));
+fs.writeFileSync(path.join(soundsDir, 'smack.wav'), createWav(smack));
 
 console.log('✅ Sound effects generated in assets/sounds/');

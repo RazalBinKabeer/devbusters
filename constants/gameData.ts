@@ -40,7 +40,7 @@ export const GAMES: GameData[] = [
     accentColor: '#FF3366',
     route: '/games/shout-to-break',
     isLocked: false,
-    comingSoon: true,
+    comingSoon: false,
     tags: ['Voice', 'Destruction'],
   },
   {
@@ -53,7 +53,7 @@ export const GAMES: GameData[] = [
     accentColor: '#7B2FF7',
     route: '/games/asset-destroy',
     isLocked: false,
-    comingSoon: true,
+    comingSoon: false,
     tags: ['Destruction', 'Rage'],
   },
   {
@@ -66,7 +66,7 @@ export const GAMES: GameData[] = [
     accentColor: '#FFD23F',
     route: '/games/whack-your-boss',
     isLocked: false,
-    comingSoon: true,
+    comingSoon: false,
     tags: ['Stress Relief', 'Customizable'],
   },
   {

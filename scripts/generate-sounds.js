@@ -135,6 +135,14 @@ const shatter = generateSamples(0.4, (t) => {
   return (noise + tinkle1 + tinkle2) * env;
 });
 
+// ── Smack (Whack Your Boss) ──────────────────────
+const smack = generateSamples(0.2, (t) => {
+  const env = Math.exp(-t * 30);
+  const noise = (Math.random() * 2 - 1) * 0.4;
+  const thud = Math.sin(2 * Math.PI * 100 * t) * 0.6;
+  return (noise + thud) * env;
+});
+
 // Write files
 fs.writeFileSync(path.join(soundsDir, 'squash.wav'), createWav(squash));
 fs.writeFileSync(path.join(soundsDir, 'powerup.wav'), createWav(powerup));
@@ -145,5 +153,6 @@ fs.writeFileSync(path.join(soundsDir, 'explosion.wav'), createWav(explosion));
 fs.writeFileSync(path.join(soundsDir, 'slice.wav'), createWav(slice));
 fs.writeFileSync(path.join(soundsDir, 'gunfire.wav'), createWav(gunfire));
 fs.writeFileSync(path.join(soundsDir, 'shatter.wav'), createWav(shatter));
+fs.writeFileSync(path.join(soundsDir, 'smack.wav'), createWav(smack));
 
 console.log('✅ Sound effects generated in assets/sounds/');

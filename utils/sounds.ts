@@ -49,13 +49,17 @@ class SoundManager {
       await shatterSound.loadAsync(require('../assets/sounds/shatter.wav'));
       this.sounds['shatter'] = shatterSound;
 
+      const smackSound = new Audio.Sound();
+      await smackSound.loadAsync(require('../assets/sounds/smack.wav'));
+      this.sounds['smack'] = smackSound;
+
       console.log('✅ Sounds loaded successfully');
     } catch (e) {
       console.warn('Failed to load sounds', e);
     }
   }
 
-  async play(soundName: 'squash' | 'powerup' | 'life-lost' | 'game-over' | 'laser' | 'explosion' | 'slice' | 'gunfire' | 'shatter') {
+  async play(soundName: 'squash' | 'powerup' | 'life-lost' | 'game-over' | 'laser' | 'explosion' | 'slice' | 'gunfire' | 'shatter' | 'smack') {
     if (this.isMuted) return;
     
     try {

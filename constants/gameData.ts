@@ -66,7 +66,7 @@ export const GAMES: GameData[] = [
     accentColor: '#FFD23F',
     route: '/games/whack-your-boss',
     isLocked: false,
-    comingSoon: true,
+    comingSoon: false,
     tags: ['Stress Relief', 'Customizable'],
   },
   {
